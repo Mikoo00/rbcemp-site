@@ -457,6 +457,36 @@ footer{background:var(--bg-white);border-top:1px solid var(--glass-border);paddi
   .svc-card:hover,.team-card:hover,.news-card:hover,.rev-card:hover,.cnt-card:hover,.vac-card:hover,.about-feat:hover{transform:none}
   .svc-card:active,.team-card:active,.news-card:active{transform:scale(.98)}
 }
+
+/* Онлайн-чат поддержки */
+.support-widget{position:fixed;right:24px;bottom:24px;z-index:9998;font-family:inherit}
+.support-launch{display:flex;align-items:center;gap:10px;border:0;border-radius:999px;padding:15px 21px;background:var(--primary);color:#fff;font-weight:700;box-shadow:0 8px 28px rgba(2,132,199,.3);cursor:pointer;transition:.2s}
+.support-launch:hover{transform:translateY(-2px);background:var(--primary-dark)}
+.support-launch i{font-size:21px}
+.support-panel{display:none;position:absolute;right:0;bottom:70px;width:min(360px,calc(100vw - 32px));height:490px;max-height:calc(100vh - 120px);background:#fff;border:1px solid #e2e8f0;border-radius:18px;box-shadow:0 18px 55px rgba(15,23,42,.2);overflow:hidden;color:#1e293b}
+.support-panel.open{display:flex;flex-direction:column;animation:supportIn .18s ease-out}
+@keyframes supportIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.support-head{background:var(--primary);color:#fff;padding:16px 18px;display:flex;align-items:center;justify-content:space-between}
+.support-head strong{display:block;font-size:15px}.support-head small{display:block;margin-top:4px;font-size:11px;opacity:.9}
+.support-head button{border:0;background:transparent;color:#fff;font-size:22px;cursor:pointer}
+.support-online{display:inline-block;width:7px;height:7px;border-radius:50%;background:#86efac;margin-right:5px}
+.support-body{display:flex;flex:1;min-height:0;flex-direction:column;padding:14px;gap:10px}
+.support-welcome{background:#f1f5f9;border-radius:12px;padding:11px 13px;font-size:13px}
+.support-welcome p{margin-top:4px;color:#64748b;line-height:1.45}
+.support-messages{display:flex;flex:1;min-height:60px;overflow:auto;flex-direction:column;gap:8px}
+.support-msg{max-width:88%;padding:9px 11px;border-radius:12px;background:#f1f5f9;font-size:13px;line-height:1.45;overflow-wrap:anywhere;align-self:flex-start}
+.support-msg.mine{background:#e0f2fe;align-self:flex-end}
+.support-msg small{display:block;margin-top:4px;color:#64748b;font-size:10px}
+.support-start,.support-reply{display:flex;flex-direction:column;gap:8px}
+.support-start input,.support-start textarea,.support-reply textarea{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:10px;font:inherit;font-size:13px;resize:vertical;min-height:40px}
+.support-start textarea,.support-reply textarea{min-height:68px}
+.support-start button{border:0;border-radius:10px;background:var(--primary);color:white;padding:11px 13px;font-weight:700;display:flex;justify-content:space-between;align-items:center;cursor:pointer}
+.support-reply{flex-direction:row;align-items:stretch}
+.support-reply textarea{flex:1;min-height:44px;max-height:90px}
+.support-reply button{width:46px;border:0;border-radius:10px;background:var(--primary);color:#fff;font-size:19px;cursor:pointer}
+.support-foot{font-size:10px;color:#94a3b8;text-align:center}
+@media(max-width:600px){.support-widget{right:14px;bottom:14px}.support-launch{padding:13px 17px}.support-panel{bottom:64px;height:min(490px,calc(100vh - 100px))}}
+
 </style>
 </head>
 <body>
@@ -1002,6 +1032,35 @@ footer{background:var(--bg-white);border-top:1px solid var(--glass-border);paddi
   </div>
 </div>
 
+
+<!-- Плавающая онлайн-поддержка -->
+<div id="supportWidget" class="support-widget">
+  <button class="support-launch" type="button" onclick="toggleSupport()" aria-label="Открыть поддержку">
+    <i class="ri-message-3-line"></i><span>Поддержка</span>
+  </button>
+  <section class="support-panel" id="supportPanel" aria-label="Чат поддержки">
+    <header class="support-head">
+      <div><strong>Служба поддержки</strong><small><span class="support-online"></span> Обычно отвечаем быстро</small></div>
+      <button type="button" onclick="toggleSupport()" aria-label="Закрыть"><i class="ri-close-line"></i></button>
+    </header>
+    <div class="support-body">
+      <div class="support-welcome"><strong>Здравствуйте!</strong><p>Напишите нам, и оператор поможет разобраться с вашим вопросом.</p></div>
+      <div id="supportMessages" class="support-messages"></div>
+      <form id="supportStartForm" class="support-start" onsubmit="startSupport(event)">
+        <input id="supportName" maxlength="100" placeholder="Ваше имя (необязательно)">
+        <input id="supportEmail" type="email" maxlength="120" placeholder="Email для ответа (необязательно)">
+        <textarea id="supportFirstMessage" maxlength="3000" required placeholder="Опишите ваш вопрос..."></textarea>
+        <button type="submit"><span>Отправить обращение</span><i class="ri-send-plane-fill"></i></button>
+      </form>
+      <form id="supportReplyForm" class="support-reply" onsubmit="replySupport(event)" hidden>
+        <textarea id="supportReplyText" maxlength="3000" required placeholder="Напишите сообщение..."></textarea>
+        <button type="submit" aria-label="Отправить"><i class="ri-send-plane-fill"></i></button>
+      </form>
+      <div class="support-foot">Не отправляйте через чат пароли и медицинские документы.</div>
+    </div>
+  </section>
+</div>
+
 <div class="toast" id="toast">
   <div class="toast-ico"><svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
   <div><strong id="toastTitle">Успешно!</strong><p id="toastMsg">Ваше обращение отправлено</p></div>
@@ -1048,8 +1107,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('ru-RU', {day:'2-digit', month:'long', year:'numeric'}) : '—';
 const fmtDT = iso => iso ? new Date(iso).toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'}) : '—';
 const initialsOf = n => String(n || '?').trim().split(/\s+/).map(w => w[0]).join('').substring(0,2).toUpperCase();
-const ROLE_LABEL = {admin:'Администратор', moderator:'Модератор', user:'Пациент'};
-const isStaff = u => u && (u.role === 'admin' || u.role === 'moderator');
+const ROLE_LABEL = {admin:'Администратор', moderator:'Модератор', operator:'Оператор', user:'Пациент'};
+const isStaff = u => u && ['admin', 'moderator', 'operator'].includes(u.role);
 const isAdmin = u => u && u.role === 'admin';
 
 async function refreshSession() {
@@ -1163,7 +1222,7 @@ async function renderProfile() {
   const staffItem = isStaff(user) ? `
     <div class="profile-menu-item" onclick="location.href='admin.html'">
       <svg viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2"/></svg>
-      ${isAdmin(user) ? 'Панель администратора' : 'Панель модератора'}
+      ${isAdmin(user) ? 'Панель администратора' : user.role === 'operator' ? 'Панель оператора' : 'Панель модератора'}
     </div>` : '';
   const render = (appts, revs) => {
     const apptRows = appts.length ? appts.slice(0, 8).map(a => `
@@ -1710,6 +1769,55 @@ function bindCookieButtons() {
   b('btnReject', rejectOptionalCookies);
   b('btnSaveSettings', saveCookieSettings);
   b('btnAcceptAllFromModal', () => { acceptAllCookies(); closeM('cookieSettings'); });
+}
+
+
+/* ===== ЧАТ ПОДДЕРЖКИ ===== */
+const SUPPORT_TOKEN_KEY='rbcemp_support_guest_v1', SUPPORT_TICKET_KEY='rbcemp_support_ticket_v1';
+let supportTicketId=Number(localStorage.getItem(SUPPORT_TICKET_KEY)||0), supportPoll=null;
+function supportToken(){
+  let t=localStorage.getItem(SUPPORT_TOKEN_KEY);
+  if(!t){const bytes=new Uint8Array(24);crypto.getRandomValues(bytes);t=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');localStorage.setItem(SUPPORT_TOKEN_KEY,t)}
+  return t;
+}
+function toggleSupport(){
+  const p=document.getElementById('supportPanel');p.classList.toggle('open');
+  if(p.classList.contains('open')){loadSupportChat();if(supportPoll)clearInterval(supportPoll);supportPoll=setInterval(loadSupportChat,6000)}
+  else if(supportPoll){clearInterval(supportPoll);supportPoll=null}
+}
+async function startSupport(e){
+  e.preventDefault();
+  const message=document.getElementById('supportFirstMessage').value.trim();if(!message)return;
+  const payload={message,guest_token:supportToken(),name:document.getElementById('supportName').value.trim(),email:document.getElementById('supportEmail').value.trim()};
+  const btn=e.target.querySelector('button');btn.disabled=true;
+  try{const r=await api('POST','/support/tickets',payload);supportTicketId=r.ticket_id;localStorage.setItem(SUPPORT_TICKET_KEY,String(supportTicketId));e.target.hidden=true;document.getElementById('supportReplyForm').hidden=false;await loadSupportChat();showToast('success','Обращение отправлено','Оператор ответит в этом чате.')}
+  catch(err){showToast('error','Не удалось отправить',err.message)}finally{btn.disabled=false}
+}
+async function loadSupportChat(){
+  if(!supportTicketId)return;
+  try{
+    const token=supportToken();
+    const r=await api('GET',`/support/tickets/${supportTicketId}?token=${encodeURIComponent(token)}`);
+    const box=document.getElementById('supportMessages');
+    box.innerHTML=r.ticket.messages.map(m=>`<div class="support-msg ${m.sender_role==='guest'||m.sender_role==='user'?'mine':''}">${esc(m.message)}<small>${m.sender_role==='operator'?'Поддержка':'Вы'} · ${esc(fmtDT(m.created_at))}</small></div>`).join('');
+    box.scrollTop=box.scrollHeight;
+    document.getElementById('supportStartForm').hidden=true;
+    document.getElementById('supportReplyForm').hidden=r.ticket.status==='closed';
+    if(r.ticket.status==='closed'&&!box.querySelector('.support-closed'))box.insertAdjacentHTML('beforeend','<div class="support-closed" style="text-align:center;color:#64748b;font-size:12px">Обращение закрыто · <button type="button" onclick="newSupportTicket()" style="border:0;background:none;color:var(--primary);font-weight:700;cursor:pointer">Новое обращение</button></div>');
+  }catch(e){supportTicketId=0;localStorage.removeItem(SUPPORT_TICKET_KEY);document.getElementById('supportStartForm').hidden=false;document.getElementById('supportReplyForm').hidden=true}
+}
+function newSupportTicket(){
+  supportTicketId=0;localStorage.removeItem(SUPPORT_TICKET_KEY);
+  document.getElementById('supportMessages').innerHTML='';
+  document.getElementById('supportStartForm').hidden=false;
+  document.getElementById('supportReplyForm').hidden=true;
+  document.getElementById('supportFirstMessage').value='';
+}
+async function replySupport(e){
+  e.preventDefault();const field=document.getElementById('supportReplyText'),message=field.value.trim();if(!message)return;
+  const btn=e.target.querySelector('button');btn.disabled=true;
+  try{await api('POST',`/support/tickets/${supportTicketId}/messages`,{message,guest_token:supportToken()});field.value='';await loadSupportChat()}
+  catch(err){showToast('error','Не удалось отправить',err.message)}finally{btn.disabled=false}
 }
 
 /* ===== INIT ===== */

@@ -159,6 +159,22 @@ td small{color:var(--text-muted);font-size:.74rem}
   .topbar{padding:0 12px}
   .toast{left:10px;right:10px;bottom:10px;max-width:none}
 }
+
+.support-admin-layout{display:grid;grid-template-columns:minmax(250px,340px) minmax(0,1fr);gap:16px;align-items:start}
+.support-ticket-list{display:flex;flex-direction:column;gap:8px;max-height:650px;overflow:auto}
+.support-ticket{position:relative;text-align:left;border:1px solid var(--glass-border);background:#fff;border-radius:12px;padding:12px;cursor:pointer;color:var(--text);display:flex;flex-direction:column;gap:5px}
+.support-ticket.active{border-color:var(--primary);background:#f0f9ff}
+.support-ticket strong{font-size:13px}.support-ticket small,.support-ticket span{font-size:11px;color:var(--text-muted)}.support-ticket span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.support-ticket em{font-size:10px;font-style:normal;font-weight:700}.ticket-open{color:#059669}.ticket-closed{color:#64748b}
+.support-ticket-detail{border:1px solid var(--glass-border);border-radius:14px;background:#fff;padding:14px;min-height:300px}
+.support-detail-head{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid var(--glass-border);padding-bottom:12px}
+.support-detail-head strong,.support-detail-head small{display:block}.support-detail-head small{font-size:11px;color:var(--text-muted);margin-top:4px}
+.support-admin-messages{height:390px;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:14px 0}
+.support-admin-msg{align-self:flex-start;max-width:85%;background:#f1f5f9;border-radius:12px;padding:10px 12px}.support-admin-msg.operator{align-self:flex-end;background:#e0f2fe}
+.support-admin-msg p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.support-admin-msg small{display:block;margin-top:5px;color:var(--text-muted);font-size:10px}
+.support-admin-reply{display:flex;gap:10px;align-items:end}.support-admin-reply textarea{flex:1;min-height:75px;border:1px solid var(--glass-border);border-radius:10px;padding:10px;font:inherit;resize:vertical}
+@media(max-width:800px){.support-admin-layout{grid-template-columns:1fr}.support-ticket-list{max-height:280px}.support-admin-messages{height:300px}.support-detail-head{align-items:flex-start;flex-direction:column}}
+
 </style>
 </head>
 <body>
@@ -267,8 +283,8 @@ const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('ru-RU', {day:'2-d
 const fmtDT = iso => iso ? new Date(iso).toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'}) : '—';
 const fmtD = d => d ? esc(String(d).split('-').reverse().join('.')) : '—';
 const initialsOf = n => String(n || '?').trim().split(/\s+/).map(w => w[0]).join('').substring(0, 2).toUpperCase();
-const ROLE_LABEL = {admin:'Администратор', moderator:'Модератор', user:'Пациент'};
-const isStaff = u => u && (u.role === 'admin' || u.role === 'moderator');
+const ROLE_LABEL = {admin:'Администратор', moderator:'Модератор', operator:'Оператор', user:'Пациент'};
+const isStaff = u => u && ['admin','moderator','operator'].includes(u.role);
 const isAdmin = u => u && u.role === 'admin';
 
 const APPT_STATUS = {new:['Новая','st-new'], confirmed:['Подтверждена','st-ok'], done:['Завершена','st-done'], cancelled:['Отменена','st-bad']};
@@ -338,6 +354,7 @@ async function logout() {
 /* ===== РАЗДЕЛЫ ============================== */
 /* ============================================ */
 const TABS = [
+  {id:'support',      title:'Поддержка',    icon:'ri-customer-service-2-line', sub:'Обращения пользователей', operator:true},
   {id:'overview',     title:'Обзор',        icon:'ri-dashboard-line',        sub:'Сводка по сайту'},
   {id:'appointments', title:'Записи',       icon:'ri-calendar-check-line',   sub:'Записи пациентов на приём', badge:'newAppointments'},
   {id:'reviews',      title:'Отзывы',       icon:'ri-chat-quote-line',       sub:'Модерация отзывов пациентов', badge:'pendingReviews'},
@@ -346,7 +363,12 @@ const TABS = [
   {id:'ads',          title:'Реклама',      icon:'ri-advertisement-line',    sub:'Баннеры и рекламные сети', admin:true},
   {id:'audit',        title:'Журнал',       icon:'ri-history-line',          sub:'История действий в панели', admin:true},
 ];
-const visibleTabs = () => TABS.filter(t => !t.admin || isAdmin(state.user));
+const visibleTabs = () => TABS.filter(t => {
+  const u=state.user;
+  if (t.admin && !isAdmin(u)) return false;
+  if (u?.role === 'operator') return t.id === 'support';
+  return true;
+});
 const tabFromHash = () => {
   const id = location.hash.replace('#', '');
   return visibleTabs().some(t => t.id === id) ? id : 'overview';
@@ -426,6 +448,7 @@ const GRIDS = {
       <td>${esc(u.email)}<br><small>${esc(u.phone)}</small></td>
       <td><select class="mini-sel" ${self ? 'disabled' : ''} onchange="patchUser(${u.id},{role:this.value})">
         <option value="user" ${u.role === 'user' ? 'selected' : ''}>Пользователь</option>
+        <option value="operator" ${u.role === 'operator' ? 'selected' : ''}>Оператор</option>
         <option value="moderator" ${u.role === 'moderator' ? 'selected' : ''}>Модератор</option>
         <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Администратор</option></select></td>
       <td>${u.status === 'active' ? '<span class="st-pill st-ok">Активен</span>' : '<span class="st-pill st-bad">Заблокирован</span>'}</td>
@@ -465,9 +488,10 @@ async function loadTab() {
   const my = ++loadSeq, tab = curTab;
   body.innerHTML = '<div class="empty">Загрузка…</div>';
   try {
-    await refreshStats();
+    if (state.user.role !== 'operator') await refreshStats();
     if (my !== loadSeq) return;
-    if (tab === 'overview') drawOverview(body);
+    if (tab === 'support') await drawSupport(body, my);
+    else if (tab === 'overview') drawOverview(body);
     else if (tab === 'ads') await drawAds(body, my);
     else {
       const g = GRIDS[tab];
@@ -497,8 +521,8 @@ function drawOverview(body) {
     </div>
     <div class="note"><strong>Ваши права: ${esc(ROLE_LABEL[me.role])}</strong>
       ${isAdmin(me)
-        ? 'Полный доступ: управление пользователями и ролями, записи, отзывы, резюме, настройки рекламы и журнал действий.'
-        : 'Обработка записей на приём и модерация отзывов. Управление пользователями и резюме недоступно.'}</div>`;
+        ? 'Полный доступ: управление пользователями и ролями, записи, отзывы, обращения поддержки, резюме, настройки рекламы и журнал действий.'
+        : 'Обработка записей на приём, модерация отзывов и ответы на обращения поддержки.'}</div>`;
 }
 
 function drawGridShell(body, g) {
@@ -525,6 +549,46 @@ function drawGridRows(g) {
     ? rows.map(g.row).join('')
     : `<tr><td colspan="${g.head.length}" class="empty">${q || view.status ? 'Ничего не найдено' : g.empty}</td></tr>`;
   $('fCount').textContent = rows.length === cache.length ? `Всего: ${cache.length}` : `Показано ${rows.length} из ${cache.length}`;
+}
+
+
+/* ---------- обращения в поддержку ---------- */
+let selectedTicket = 0;
+async function drawSupport(body, my) {
+  const {items}=await api('GET','/operator/tickets');
+  if(my!==loadSeq)return;
+  const open=items.filter(t=>t.status==='open').length;
+  body.innerHTML=`<div class="note"><strong>Обращения пользователей</strong><br>Открытых обращений: ${open}. Выберите обращение, чтобы прочитать переписку и ответить.</div>
+    <div class="toolbar"><span class="count">Всего обращений: ${items.length}</span><button class="btn btn-o" onclick="loadTab()"><i class="ri-refresh-line"></i>Обновить</button></div>
+    <div class="support-admin-layout">
+      <div class="support-ticket-list">${items.length?items.map(t=>`<button class="support-ticket ${selectedTicket===Number(t.id)?'active':''}" onclick="openSupportTicket(${Number(t.id)})">
+        <strong>#${t.id} · ${esc(t.user_name||t.guest_name||'Гость')}</strong><small>${esc(t.subject)} · ${esc(fmtDT(t.updated_at))}</small>
+        <span>${esc((t.last_message||'').slice(0,100))}</span><em class="${t.status==='open'?'ticket-open':'ticket-closed'}">${t.status==='open'?'Открыто':'Закрыто'}</em></button>`).join(''):'<div class="empty">Обращений пока нет</div>'}</div>
+      <div class="support-ticket-detail" id="supportTicketDetail"><div class="empty">Выберите обращение слева</div></div>
+    </div>`;
+  if(selectedTicket && items.some(t=>Number(t.id)===selectedTicket)) await openSupportTicket(selectedTicket);
+}
+async function openSupportTicket(id){
+  selectedTicket=id;
+  const box=$('supportTicketDetail');if(!box)return;
+  box.innerHTML='<div class="empty">Загрузка переписки…</div>';
+  try{
+    const r=await api('GET',`/operator/tickets/${id}`),t=r.ticket;
+    box.innerHTML=`<div class="support-detail-head"><div><strong>Обращение #${id}</strong><small>${esc(t.user_name||t.guest_name||'Гость')} · ${esc(t.user_email||t.guest_email||'')}</small></div>
+      <button class="btn btn-o" onclick="setTicketStatus(${id},'${t.status==='open'?'closed':'open'}')">${t.status==='open'?'Закрыть обращение':'Открыть обращение'}</button></div>
+      <div class="support-admin-messages" id="supportAdminMessages">${r.messages.map(m=>`<div class="support-admin-msg ${m.sender_role==='operator'?'operator':''}"><p>${esc(m.message)}</p><small>${m.sender_role==='operator'?'Оператор':m.sender_role==='guest'?'Посетитель':'Пользователь'} · ${esc(fmtDT(m.created_at))}</small></div>`).join('')}</div>
+      ${t.status==='open'?`<form class="support-admin-reply" onsubmit="sendOperatorReply(event,${id})"><textarea id="operatorReply" required maxlength="3000" placeholder="Введите ответ пользователю..."></textarea><button class="btn btn-p"><i class="ri-send-plane-fill"></i>Ответить</button></form>`:'<div class="hint">Обращение закрыто. Откройте его, чтобы продолжить переписку.</div>'}`;
+    const msgs=$('supportAdminMessages');msgs.scrollTop=msgs.scrollHeight;
+  }catch(e){box.innerHTML=`<div class="empty">${esc(e.message)}</div>`}
+}
+async function sendOperatorReply(e,id){
+  e.preventDefault();const f=$('operatorReply'),message=f.value.trim();if(!message)return;
+  try{await api('POST',`/operator/tickets/${id}/messages`,{message});await openSupportTicket(id);toast('success','Ответ отправлен','Пользователь увидит сообщение в чате.')}
+  catch(err){toast('error','Ошибка',err.message)}
+}
+async function setTicketStatus(id,status){
+  try{await api('PATCH',`/operator/tickets/${id}`,{status});await drawSupport($('tabBody'),loadSeq);toast('success','Статус изменён','')}
+  catch(e){toast('error','Ошибка',e.message)}
 }
 
 /* ---------- реклама ---------- */

@@ -539,6 +539,108 @@ route('DELETE', '/admin/ads/house/:id', 'admin', function ($c) {
     json_out(200, ['ok' => true]);
 });
 
+
+/* ============ ПОДДЕРЖКА ============ */
+route('POST', '/support/tickets', null, function ($c) {
+    $b = $c['body'];
+    limit('support:' . $c['ip'], 12, 3600);
+    $message = vstr($b['message'] ?? null, 2, 3000, 'Сообщение', 'message');
+    $u = $c['user'];
+    $guestToken = '';
+    $guestName = '';
+    $guestEmail = '';
+    if (!$u) {
+        $guestToken = vstr($b['guest_token'] ?? null, 24, 100, 'Токен обращения');
+        $guestName = vopt($b['name'] ?? null, 100, 'Имя');
+        $guestEmail = vemail($b['email'] ?? null, false);
+    }
+    $subject = vopt($b['subject'] ?? null, 120, 'Тема');
+    if ($subject === '') $subject = 'Обращение в поддержку';
+    q("INSERT INTO support_tickets (user_id,guest_token,guest_name,guest_email,subject,status,created_at,updated_at)
+       VALUES (?,?,?,?,?,'open',?,?)", [$u['id'] ?? null, $u ? null : $guestToken, $guestName, $guestEmail, $subject, now(), now()]);
+    $id = last_id();
+    q("INSERT INTO support_messages (ticket_id,sender_id,sender_role,message,created_at) VALUES (?,?,? ,?,?)",
+      [$id, $u['id'] ?? null, $u['role'] ?? 'guest', $message, now()]);
+    json_out(201, ['ticket_id' => $id]);
+});
+
+route('GET', '/support/tickets/:id', null, function ($c) {
+    $id = to_id($c['params']['id']);
+    $ticket = row('SELECT * FROM support_tickets WHERE id = ?', [$id]);
+    if (!$ticket) throw new HttpError(404, 'Обращение не найдено');
+    $u = $c['user'];
+    if ($u && ROLE_RANK[$u['role']] >= ROLE_RANK['operator']) {
+        // Оператор может читать все обращения.
+    } elseif ($ticket['user_id'] !== null) {
+        if (!$u || (int)$ticket['user_id'] !== (int)$u['id']) throw new HttpError(403, 'Нет доступа к обращению');
+    } else {
+        $token = (string)($_GET['token'] ?? '');
+        if ($token === '' || !hash_equals((string)$ticket['guest_token'], $token)) throw new HttpError(403, 'Нет доступа к обращению');
+    }
+    json_out(200, ['ticket' => [
+      'id'=>(int)$ticket['id'],'subject'=>$ticket['subject'],'status'=>$ticket['status'],
+      'created_at'=>$ticket['created_at'],'updated_at'=>$ticket['updated_at'],
+      'messages'=>rows('SELECT id,sender_role,message,created_at FROM support_messages WHERE ticket_id=? ORDER BY id ASC',[$id])
+    ]]);
+});
+
+route('POST', '/support/tickets/:id/messages', null, function ($c) {
+    $id = to_id($c['params']['id']);
+    $ticket = row('SELECT * FROM support_tickets WHERE id=?',[$id]);
+    if (!$ticket) throw new HttpError(404,'Обращение не найдено');
+    if ($ticket['status'] === 'closed') throw bad('Обращение закрыто');
+    $u = $c['user']; $b = $c['body'];
+    $staff = $u && ROLE_RANK[$u['role']] >= ROLE_RANK['operator'];
+    if (!$staff) {
+        if ($ticket['user_id'] !== null) {
+            if (!$u || (int)$ticket['user_id'] !== (int)$u['id']) throw new HttpError(403,'Нет доступа к обращению');
+        } else {
+            $token = (string)($b['guest_token'] ?? '');
+            if ($token === '' || !hash_equals((string)$ticket['guest_token'],$token)) throw new HttpError(403,'Нет доступа к обращению');
+        }
+    }
+    $message = vstr($b['message'] ?? null, 1, 3000, 'Сообщение');
+    q('INSERT INTO support_messages (ticket_id,sender_id,sender_role,message,created_at) VALUES (?,?,?,?,?)',
+      [$id,$u['id'] ?? null,$u['role'] ?? 'guest',$message,now()]);
+    q('UPDATE support_tickets SET updated_at=? WHERE id=?',[now(),$id]);
+    json_out(201,['ok'=>true]);
+});
+
+route('GET', '/operator/tickets', 'operator', function () {
+    json_out(200,['items'=>rows("SELECT t.*, u.name AS user_name, u.email AS user_email,
+      (SELECT message FROM support_messages m WHERE m.ticket_id=t.id ORDER BY m.id DESC LIMIT 1) AS last_message,
+      (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id=t.id) AS message_count
+      FROM support_tickets t LEFT JOIN users u ON u.id=t.user_id
+      ORDER BY CASE t.status WHEN 'open' THEN 0 ELSE 1 END,t.updated_at DESC LIMIT 300")]);
+});
+
+route('GET', '/operator/tickets/:id', 'operator', function ($c) {
+    $id=to_id($c['params']['id']);
+    $ticket=row("SELECT t.*,u.name AS user_name,u.email AS user_email FROM support_tickets t LEFT JOIN users u ON u.id=t.user_id WHERE t.id=?",[$id]);
+    if(!$ticket) throw new HttpError(404,'Обращение не найдено');
+    json_out(200,['ticket'=>$ticket,'messages'=>rows('SELECT id,sender_role,message,created_at FROM support_messages WHERE ticket_id=? ORDER BY id ASC',[$id])]);
+});
+
+route('POST', '/operator/tickets/:id/messages', 'operator', function ($c) {
+    $id=to_id($c['params']['id']); $b=$c['body'];
+    $ticket=row('SELECT id,status FROM support_tickets WHERE id=?',[$id]);
+    if(!$ticket) throw new HttpError(404,'Обращение не найдено');
+    if($ticket['status']==='closed') throw bad('Обращение закрыто');
+    $message=vstr($b['message']??null,1,3000,'Сообщение');
+    q('INSERT INTO support_messages (ticket_id,sender_id,sender_role,message,created_at) VALUES (?,?,?,?,?)',[$id,$c['user']['id'],'operator',$message,now()]);
+    q('UPDATE support_tickets SET updated_at=?,assigned_to=? WHERE id=?',[now(),$c['user']['id'],$id]);
+    json_out(201,['ok'=>true]);
+});
+
+route('PATCH', '/operator/tickets/:id', 'operator', function ($c) {
+    $id=to_id($c['params']['id']);
+    $status=one_of($c['body']['status']??null,['open','closed'],'Статус');
+    if(q('UPDATE support_tickets SET status=?,updated_at=? WHERE id=?',[$status,now(),$id])->rowCount()===0) throw new HttpError(404,'Обращение не найдено');
+    audit($c['user'],'support.ticket.status',"обращение #{$id} → {$status}");
+    json_out(200,['ok'=>true]);
+});
+
+
 /* ============ ЗАПУСК ============ */
 
 try {

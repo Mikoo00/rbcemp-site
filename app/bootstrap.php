@@ -15,8 +15,8 @@ error_reporting(E_ALL);
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 
-const ROLES = ['user', 'moderator', 'admin'];
-const ROLE_RANK = ['user' => 1, 'moderator' => 2, 'admin' => 3];
+const ROLES = ['user', 'operator', 'moderator', 'admin'];
+const ROLE_RANK = ['user' => 1, 'operator' => 2, 'moderator' => 3, 'admin' => 4];
 
 function cfg(string $key, $default = null)
 {
@@ -69,7 +69,40 @@ function db(): PDO
 function migrate(PDO $pdo): void
 {
     $version = (int) $pdo->query('PRAGMA user_version')->fetchColumn();
+    if ($version >= 2) {
+        return;
+    }
     if ($version >= 1) {
+        // Расширяем список ролей без потери существующих пользователей и связанных записей.
+        $pdo->exec('PRAGMA foreign_keys = OFF');
+        $pdo->exec("CREATE TABLE users_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE COLLATE NOCASE, phone TEXT NOT NULL,
+          phone_norm TEXT NOT NULL, pass_hash TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user','operator','moderator','admin')),
+          status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','blocked')),
+          created_at TEXT NOT NULL, last_login TEXT
+        )");
+        $pdo->exec('INSERT INTO users_new SELECT id,name,email,phone,phone_norm,pass_hash,role,status,created_at,last_login FROM users');
+        $pdo->exec('DROP TABLE users');
+        $pdo->exec('ALTER TABLE users_new RENAME TO users');
+        $pdo->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone_norm)');
+        $pdo->exec('PRAGMA foreign_keys = ON');
+        $pdo->exec("CREATE TABLE IF NOT EXISTS support_tickets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          guest_token TEXT, guest_name TEXT, guest_email TEXT,
+          subject TEXT NOT NULL DEFAULT 'Обращение в поддержку',
+          status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','closed')),
+          assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        )");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS support_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+          sender_id INTEGER REFERENCES users(id) ON DELETE SET NULL, sender_role TEXT NOT NULL,
+          message TEXT NOT NULL, created_at TEXT NOT NULL
+        )");
+        $pdo->exec('CREATE INDEX IF NOT EXISTS idx_support_ticket_updated ON support_tickets(updated_at)');
+        $pdo->exec('PRAGMA user_version = 2');
         return;
     }
     $pdo->exec("
@@ -80,7 +113,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone TEXT NOT NULL,
   phone_norm TEXT NOT NULL,
   pass_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user','moderator','admin')),
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user','operator','moderator','admin')),
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','blocked')),
   created_at TEXT NOT NULL,
   last_login TEXT
@@ -139,8 +172,22 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   c INTEGER NOT NULL,
   reset_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  guest_token TEXT, guest_name TEXT, guest_email TEXT,
+  subject TEXT NOT NULL DEFAULT 'Обращение в поддержку',
+  status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','closed')),
+  assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS support_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, ticket_id INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+  sender_id INTEGER REFERENCES users(id) ON DELETE SET NULL, sender_role TEXT NOT NULL,
+  message TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_support_ticket_updated ON support_tickets(updated_at);
 ");
-    $pdo->exec('PRAGMA user_version = 1');
+    $pdo->exec('PRAGMA user_version = 2');
     seed_reviews($pdo);
     seed_house_ads($pdo);
 }
