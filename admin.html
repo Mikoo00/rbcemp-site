@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0ea5e9">
+<title>Панель управления — РБ №2-ЦЭМП</title>
+<link href="https://cdn.jsdelivr.net/npm/remixicon@4.1.0/fonts/remixicon.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --primary:#0ea5e9;--primary-dark:#0284c7;--accent:#06b6d4;
+  --neon:#0891b2;--bg:#f1f5f9;--bg-white:#ffffff;
+  --glass:rgba(14,165,233,.05);--glass-border:rgba(14,165,233,.14);
+  --text:#1e293b;--text-muted:#64748b;
+  --grad:linear-gradient(135deg,#0ea5e9,#06b6d4);
+  --grad2:linear-gradient(135deg,#f0f9ff,#e0f2fe);
+  --shadow:0 4px 24px rgba(14,165,233,.08);
+  --shadow-h:0 12px 40px rgba(14,165,233,.14);
+  --success:#10b981;--danger:#ef4444;--warn:#f59e0b;
+  --top:60px;--side:244px;
+}
+html{-webkit-text-size-adjust:100%}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;min-height:100vh}
+button,input,select{font-family:inherit}
+[hidden]{display:none!important}
+
+/* ===== общие элементы ===== */
+.btn{padding:11px 22px;border-radius:12px;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .25s;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:none}
+.btn-p{background:var(--grad);color:#fff;box-shadow:0 4px 18px rgba(14,165,233,.3)}
+.btn-p:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(14,165,233,.4)}
+.btn-o{background:transparent;color:var(--text);border:1.5px solid var(--glass-border)}
+.btn-o:hover{background:var(--glass);border-color:var(--neon);color:var(--neon)}
+.fg{margin-bottom:16px}
+.fg label{display:block;margin-bottom:6px;font-size:.85rem;color:var(--text-muted);font-weight:500}
+.fg input,.fg select{width:100%;padding:11px 14px;background:var(--bg);border:1.5px solid var(--glass-border);border-radius:10px;color:var(--text);font-size:.93rem;transition:all .25s}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.1)}
+.mini-btn{background:var(--bg-white);border:1px solid var(--glass-border);border-radius:8px;padding:5px 10px;font-size:.74rem;font-weight:600;color:var(--text);cursor:pointer;transition:all .2s;margin:1px}
+.mini-btn:hover{border-color:var(--primary);color:var(--neon)}
+.mini-btn.danger{color:var(--danger)}
+.mini-btn.danger:hover{border-color:var(--danger);background:rgba(239,68,68,.06)}
+.mini-sel{padding:5px 8px;border:1px solid var(--glass-border);border-radius:8px;background:var(--bg-white);font-size:.78rem;color:var(--text)}
+.st-pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:.7rem;font-weight:700;white-space:nowrap}
+.st-new{background:rgba(245,158,11,.14);color:#b45309}
+.st-ok{background:rgba(16,185,129,.14);color:#047857}
+.st-done{background:rgba(14,165,233,.14);color:var(--neon)}
+.st-bad{background:rgba(239,68,68,.12);color:var(--danger)}
+.empty{padding:28px 14px;text-align:center;color:var(--text-muted);font-size:.9rem}
+
+/* ===== экран входа / отказа ===== */
+.gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.gate-card{width:100%;max-width:410px;background:var(--bg-white);border:1px solid var(--glass-border);border-radius:20px;padding:34px 30px;box-shadow:var(--shadow-h)}
+.gate-logo{width:54px;height:54px;border-radius:15px;background:var(--grad);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.7rem;margin:0 auto 14px;box-shadow:0 0 22px rgba(14,165,233,.3)}
+.gate-card h1{font-size:1.25rem;text-align:center;margin-bottom:4px}
+.gate-card .sub{font-size:.85rem;color:var(--text-muted);text-align:center;margin-bottom:22px}
+.gate-card .btn{width:100%}
+.gate-back{display:block;text-align:center;margin-top:16px;font-size:.84rem;color:var(--neon);text-decoration:none}
+.gate-back:hover{text-decoration:underline}
+.gate-err{display:none;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);color:var(--danger);padding:10px 12px;border-radius:10px;font-size:.84rem;margin-bottom:14px}
+.gate-err.show{display:block}
+.denied-ico{font-size:2.6rem;color:var(--danger);text-align:center;line-height:1;margin-bottom:10px}
+.gate-actions{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+
+/* ===== каркас панели ===== */
+.topbar{position:fixed;top:0;left:0;right:0;height:var(--top);background:rgba(255,255,255,.95);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--glass-border);z-index:50;display:flex;align-items:center;justify-content:space-between;padding:0 20px;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;min-width:0}
+.brand-ico{width:38px;height:38px;border-radius:11px;background:var(--grad);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex-shrink:0}
+.brand-t{min-width:0}
+.brand-t strong{display:block;font-size:.95rem;line-height:1.15;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-weight:800;white-space:nowrap}
+.brand-t span{font-size:.7rem;color:var(--text-muted);white-space:nowrap}
+.top-right{display:flex;align-items:center;gap:10px}
+.top-link{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;font-weight:600;color:var(--neon);text-decoration:none;padding:7px 12px;border:1.5px solid var(--glass-border);border-radius:20px;white-space:nowrap}
+.top-link:hover{background:var(--glass);border-color:var(--neon)}
+.me{display:flex;align-items:center;gap:9px}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--grad);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;flex-shrink:0}
+.me-t{line-height:1.2}
+.me-t strong{display:block;font-size:.84rem;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.role-badge{display:inline-block;padding:1px 8px;border-radius:8px;font-size:.66rem;font-weight:700}
+.role-admin{background:rgba(239,68,68,.12);color:var(--danger)}
+.role-moderator{background:rgba(245,158,11,.14);color:#b45309}
+.icon-btn{width:36px;height:36px;border-radius:10px;border:1.5px solid var(--glass-border);background:var(--bg-white);color:var(--text-muted);cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.icon-btn:hover{color:var(--danger);border-color:var(--danger)}
+
+.layout{display:flex;padding-top:var(--top);min-height:100vh}
+.side{width:var(--side);flex-shrink:0;background:var(--bg-white);border-right:1px solid var(--glass-border);padding:18px 12px;position:sticky;top:var(--top);height:calc(100vh - var(--top));overflow-y:auto}
+.side-h{font-size:.68rem;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);font-weight:700;padding:6px 12px 8px}
+.nav-item{width:100%;display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:11px;border:none;background:transparent;color:var(--text);font-size:.88rem;font-weight:600;cursor:pointer;text-align:left;transition:all .2s;margin-bottom:2px}
+.nav-item i{font-size:1.15rem;color:var(--neon)}
+.nav-item:hover{background:var(--glass);color:var(--neon)}
+.nav-item.active{background:var(--grad);color:#fff;box-shadow:0 4px 14px rgba(14,165,233,.28)}
+.nav-item.active i{color:#fff}
+.nav-badge{margin-left:auto;background:var(--warn);color:#fff;border-radius:20px;font-size:.68rem;font-weight:700;padding:1px 8px;min-width:20px;text-align:center}
+.nav-item.active .nav-badge{background:#fff;color:var(--neon)}
+.main{flex:1;min-width:0;padding:26px 28px 60px}
+.page-h{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.page-h h2{font-size:1.35rem}
+.page-h p{font-size:.84rem;color:var(--text-muted)}
+
+/* ===== обзор ===== */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px}
+.stat{background:var(--bg-white);border:1px solid var(--glass-border);border-radius:16px;padding:18px;display:flex;gap:14px;align-items:center;box-shadow:var(--shadow);cursor:pointer;transition:all .2s}
+.stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-h)}
+.stat-ico{width:46px;height:46px;border-radius:13px;background:var(--grad2);color:var(--neon);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0}
+.stat strong{display:block;font-size:1.65rem;line-height:1.1;font-weight:800}
+.stat span{font-size:.78rem;color:var(--text-muted)}
+.stat em{font-style:normal;color:#b45309;font-weight:700}
+.note{padding:15px 16px;background:var(--grad2);border-radius:14px;font-size:.86rem;color:var(--text-muted);border:1px solid var(--glass-border)}
+.note strong{display:block;color:var(--text);margin-bottom:4px}
+
+/* ===== панель инструментов и таблицы ===== */
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.search{position:relative;flex:1;min-width:200px;max-width:380px}
+.search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted)}
+.search input{width:100%;padding:10px 12px 10px 36px;border:1.5px solid var(--glass-border);border-radius:11px;background:var(--bg-white);font-size:.88rem;color:var(--text)}
+.search input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,165,233,.1)}
+.toolbar select{padding:10px 12px;border:1.5px solid var(--glass-border);border-radius:11px;background:var(--bg-white);font-size:.86rem;color:var(--text)}
+.count{margin-left:auto;font-size:.8rem;color:var(--text-muted)}
+.hint{font-size:.84rem;color:var(--text-muted);margin-bottom:12px}
+.tbl-wrap{background:var(--bg-white);border:1px solid var(--glass-border);border-radius:14px;overflow-x:auto;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;min-width:640px}
+th,td{padding:11px 14px;text-align:left;font-size:.83rem;border-bottom:1px solid var(--glass-border);vertical-align:top}
+th{background:var(--grad2);font-weight:700;color:var(--neon);font-size:.72rem;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--glass)}
+td small{color:var(--text-muted);font-size:.74rem}
+.nw{white-space:nowrap}
+.stars{color:var(--warn);letter-spacing:1px;white-space:nowrap}
+
+/* ===== реклама ===== */
+.card{background:var(--bg-white);border:1px solid var(--glass-border);border-radius:16px;padding:20px;margin-bottom:18px;box-shadow:var(--shadow)}
+.card h3{font-size:1rem;margin-bottom:12px;color:var(--neon)}
+.ads-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 14px}
+
+/* ===== уведомления ===== */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--bg-white);border:1.5px solid var(--primary);border-radius:14px;padding:13px 18px;display:none;align-items:center;gap:10px;box-shadow:var(--shadow-h);z-index:3500;max-width:340px}
+.toast.show{display:flex;animation:toastIn .3s ease}
+.toast.error{border-color:var(--danger)}
+.toast.success{border-color:var(--success)}
+@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.toast-ico{width:32px;height:32px;border-radius:50%;background:var(--grad);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1rem}
+.toast.error .toast-ico{background:linear-gradient(135deg,#ef4444,#f43f5e)}
+.toast.success .toast-ico{background:linear-gradient(135deg,#10b981,#059669)}
+.toast strong{font-size:.86rem;display:block}
+.toast p{margin:0;font-size:.78rem;color:var(--text-muted)}
+
+/* ===== адаптив ===== */
+@media(max-width:900px){
+  .layout{flex-direction:column}
+  .side{width:100%;height:auto;position:sticky;top:var(--top);z-index:40;display:flex;gap:6px;overflow-x:auto;padding:10px 12px;border-right:none;border-bottom:1px solid var(--glass-border)}
+  .side-h{display:none}
+  .nav-item{width:auto;white-space:nowrap;margin-bottom:0;flex-shrink:0}
+  .main{padding:20px 14px 60px}
+  .me-t{display:none}
+  .brand-t span{display:none}
+}
+@media(max-width:560px){
+  .top-link span{display:none}
+  .topbar{padding:0 12px}
+  .toast{left:10px;right:10px;bottom:10px;max-width:none}
+}
+
+.support-admin-layout{display:grid;grid-template-columns:minmax(250px,340px) minmax(0,1fr);gap:16px;align-items:start}
+.support-ticket-list{display:flex;flex-direction:column;gap:8px;max-height:650px;overflow:auto}
+.support-ticket{position:relative;text-align:left;border:1px solid var(--glass-border);background:#fff;border-radius:12px;padding:12px;cursor:pointer;color:var(--text);display:flex;flex-direction:column;gap:5px}
+.support-ticket.active{border-color:var(--primary);background:#f0f9ff}
+.support-ticket strong{font-size:13px}.support-ticket small,.support-ticket span{font-size:11px;color:var(--text-muted)}.support-ticket span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.support-ticket em{font-size:10px;font-style:normal;font-weight:700}.ticket-open{color:#059669}.ticket-closed{color:#64748b}
+.support-ticket-detail{border:1px solid var(--glass-border);border-radius:14px;background:#fff;padding:14px;min-height:300px}
+.support-detail-head{display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid var(--glass-border);padding-bottom:12px}
+.support-detail-head strong,.support-detail-head small{display:block}.support-detail-head small{font-size:11px;color:var(--text-muted);margin-top:4px}
+.support-admin-messages{height:390px;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:14px 0}
+.support-admin-msg{align-self:flex-start;max-width:85%;background:#f1f5f9;border-radius:12px;padding:10px 12px}.support-admin-msg.operator{align-self:flex-end;background:#e0f2fe}
+.support-admin-msg p{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.support-admin-msg small{display:block;margin-top:5px;color:var(--text-muted);font-size:10px}
+.support-admin-reply{display:flex;gap:10px;align-items:end}.support-admin-reply textarea{flex:1;min-height:75px;border:1px solid var(--glass-border);border-radius:10px;padding:10px;font:inherit;resize:vertical}
+@media(max-width:800px){.support-admin-layout{grid-template-columns:1fr}.support-ticket-list{max-height:280px}.support-admin-messages{height:300px}.support-detail-head{align-items:flex-start;flex-direction:column}}
+
+</style>
+</head>
+<body>
+
+<!-- ВХОД -->
+<div class="gate" id="gateLogin" hidden>
+  <form class="gate-card" id="loginForm" autocomplete="on">
+    <div class="gate-logo"><i class="ri-shield-user-line"></i></div>
+    <h1>Панель управления</h1>
+    <p class="sub">РБ №2-ЦЭМП · вход для сотрудников</p>
+    <div class="gate-err" id="loginErr"></div>
+    <div class="fg"><label for="loginId">Email</label><input type="email" id="loginId" name="username" autocomplete="username" required></div>
+    <div class="fg"><label for="loginPwd">Пароль</label><input type="password" id="loginPwd" name="password" autocomplete="current-password" required></div>
+    <button class="btn btn-p" type="submit" id="loginBtn"><i class="ri-login-box-line"></i>Войти</button>
+    <a class="gate-back" href="index.html">← Вернуться на сайт</a>
+  </form>
+</div>
+
+<!-- НЕТ ДОСТУПА -->
+<div class="gate" id="gateDenied" hidden>
+  <div class="gate-card">
+    <div class="denied-ico"><i class="ri-lock-2-line"></i></div>
+    <h1>Доступ запрещён</h1>
+    <p class="sub">Эта страница доступна только администраторам и модераторам. Если нужен доступ, обратитесь к администратору сайта.</p>
+    <div class="gate-actions">
+      <a class="btn btn-p" href="index.html"><i class="ri-home-4-line"></i>На сайт</a>
+      <button class="btn btn-o" type="button" onclick="logout()"><i class="ri-logout-box-r-line"></i>Войти под другим аккаунтом</button>
+    </div>
+  </div>
+</div>
+
+<!-- ПАНЕЛЬ -->
+<div id="app" hidden>
+  <header class="topbar">
+    <a class="brand" href="admin.html">
+      <div class="brand-ico"><i class="ri-hospital-line"></i></div>
+      <div class="brand-t"><strong>РБ №2-ЦЭМП</strong><span>Панель управления</span></div>
+    </a>
+    <div class="top-right">
+      <a class="top-link" href="index.html"><i class="ri-external-link-line"></i><span>На сайт</span></a>
+      <div class="me">
+        <div class="avatar" id="meAvatar"></div>
+        <div class="me-t"><strong id="meName"></strong><span class="role-badge" id="meRole"></span></div>
+      </div>
+      <button class="icon-btn" onclick="logout()" title="Выйти" aria-label="Выйти"><i class="ri-logout-box-r-line"></i></button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="side">
+      <div class="side-h">Разделы</div>
+      <nav id="sideNav"></nav>
+    </aside>
+    <main class="main">
+      <div class="page-h">
+        <div><h2 id="pageTitle"></h2><p id="pageSub"></p></div>
+        <button class="btn btn-o" type="button" onclick="loadTab()"><i class="ri-refresh-line"></i>Обновить</button>
+      </div>
+      <div id="tabBody"><div class="empty">Загрузка…</div></div>
+    </main>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <div class="toast-ico"><i class="ri-check-line" id="toastIco"></i></div>
+  <div><strong id="toastTitle"></strong><p id="toastMsg"></p></div>
+</div>
+
+<script src="supabase-api.js"></script>
+<script>
+/* ============================================ */
+/* ===== КЛИЕНТ API =========================== */
+/* ============================================ */
+const state = { user: null, stats: null };
+let serverWarned = false;
+
+async function api(method, url, body) {
+  // Все запросы идут в Supabase через supabase-api.js (формат ответов как у прежнего api.php).
+  try {
+    return await window.rbApi(method, url, body);
+  } catch (err) {
+    if (err && err.status === 0 && !serverWarned) { serverWarned = true; toast('error', 'Сервер недоступен', err.message); }
+    if (err && err.status === 401 && state.user && url !== '/auth/login') { state.user = null; route(); }
+    throw err;
+  }
+}
+
+/* ===== утилиты ===== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('ru-RU', {day:'2-digit', month:'long', year:'numeric'}) : '—';
+const fmtDT = iso => iso ? new Date(iso).toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'}) : '—';
+const fmtD = d => d ? esc(String(d).split('-').reverse().join('.')) : '—';
+const initialsOf = n => String(n || '?').trim().split(/\s+/).map(w => w[0]).join('').substring(0, 2).toUpperCase();
+const ROLE_LABEL = {admin:'Администратор', moderator:'Модератор', operator:'Оператор', user:'Пациент'};
+const isStaff = u => u && ['admin','moderator','operator'].includes(u.role);
+const isAdmin = u => u && u.role === 'admin';
+
+const APPT_STATUS = {new:['Новая','st-new'], confirmed:['Подтверждена','st-ok'], done:['Завершена','st-done'], cancelled:['Отменена','st-bad']};
+const REV_STATUS = {pending:['На модерации','st-new'], approved:['Опубликован','st-ok'], rejected:['Отклонён','st-bad']};
+const RES_STATUS = {new:['Новое','st-new'], viewed:['Просмотрено','st-done']};
+const pill = (map, s) => map[s] ? `<span class="st-pill ${map[s][1]}">${map[s][0]}</span>` : esc(s);
+
+let toastTimer = null;
+function toast(type, title, msg) {
+  const t = $('toast');
+  t.className = 'toast show ' + (type || '');
+  $('toastIco').className = type === 'error' ? 'ri-close-line' : 'ri-check-line';
+  $('toastTitle').textContent = title;
+  $('toastMsg').textContent = msg || '';
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
+}
+
+/* ============================================ */
+/* ===== ВХОД / ВЫХОД / МАРШРУТИЗАЦИЯ ========= */
+/* ============================================ */
+async function refreshSession() {
+  try { state.user = (await api('GET', '/auth/me')).user; }
+  catch (e) { state.user = null; }
+}
+
+function route() {
+  const u = state.user;
+  $('gateLogin').hidden = !!u;
+  $('gateDenied').hidden = !(u && !isStaff(u));
+  $('app').hidden = !isStaff(u);
+  if (!u) { setTimeout(() => $('loginId').focus(), 0); return; }
+  if (!isStaff(u)) return;
+  $('meAvatar').textContent = initialsOf(u.name);
+  $('meName').textContent = u.name;
+  const rb = $('meRole');
+  rb.textContent = ROLE_LABEL[u.role];
+  rb.className = 'role-badge role-' + u.role;
+  buildNav();
+  openTab(tabFromHash(), true);
+}
+
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = $('loginErr'), btn = $('loginBtn');
+  err.classList.remove('show');
+  btn.disabled = true;
+  try {
+    const r = await api('POST', '/auth/login', { id: $('loginId').value.trim(), password: $('loginPwd').value });
+    state.user = r.user;
+    $('loginForm').reset();
+    route();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.classList.add('show');
+  } finally { btn.disabled = false; }
+});
+
+async function logout() {
+  try { await api('POST', '/auth/logout'); } catch (e) {}
+  state.user = null; state.stats = null;
+  history.replaceState(null, '', location.pathname);
+  route();
+}
+
+/* ============================================ */
+/* ===== РАЗДЕЛЫ ============================== */
+/* ============================================ */
+const TABS = [
+  {id:'support',      title:'Поддержка',    icon:'ri-customer-service-2-line', sub:'Обращения пользователей', operator:true},
+  {id:'overview',     title:'Обзор',        icon:'ri-dashboard-line',        sub:'Сводка по сайту'},
+  {id:'appointments', title:'Записи',       icon:'ri-calendar-check-line',   sub:'Записи пациентов на приём', badge:'newAppointments'},
+  {id:'reviews',      title:'Отзывы',       icon:'ri-chat-quote-line',       sub:'Модерация отзывов пациентов', badge:'pendingReviews'},
+  {id:'users',        title:'Пользователи', icon:'ri-user-settings-line',    sub:'Роли, блокировка и сброс паролей', admin:true},
+  {id:'resumes',      title:'Резюме',       icon:'ri-file-user-line',        sub:'Отклики на вакансии', admin:true, badge:'newResumes'},
+  {id:'ads',          title:'Реклама',      icon:'ri-advertisement-line',    sub:'Баннеры и рекламные сети', admin:true},
+  {id:'audit',        title:'Журнал',       icon:'ri-history-line',          sub:'История действий в панели', admin:true},
+];
+const visibleTabs = () => TABS.filter(t => {
+  const u=state.user;
+  if (t.admin && !isAdmin(u)) return false;
+  if (u?.role === 'operator') return t.id === 'support';
+  return true;
+});
+const tabFromHash = () => {
+  const id = location.hash.replace('#', '');
+  return visibleTabs().some(t => t.id === id) ? id : 'overview';
+};
+let curTab = 'overview';
+let view = { q: '', status: '' };   // фильтры текущей таблицы
+let cache = [];                     // данные текущей таблицы
+
+function buildNav() {
+  const s = state.stats || {};
+  $('sideNav').innerHTML = visibleTabs().map(t => {
+    const n = t.badge ? Number(s[t.badge]) || 0 : 0;
+    return `<button class="nav-item ${t.id === curTab ? 'active' : ''}" onclick="openTab('${t.id}')">
+      <i class="${t.icon}"></i>${t.title}${n ? `<span class="nav-badge">${n}</span>` : ''}</button>`;
+  }).join('');
+}
+
+function openTab(id, silent) {
+  curTab = id;
+  view = { q: '', status: '' };
+  if (!silent && location.hash !== '#' + id) history.replaceState(null, '', '#' + id);
+  const t = TABS.find(x => x.id === id);
+  $('pageTitle').textContent = t.title;
+  $('pageSub').textContent = t.sub;
+  document.title = t.title + ' — Панель управления РБ №2-ЦЭМП';
+  buildNav();
+  loadTab();
+}
+window.addEventListener('hashchange', () => { if (isStaff(state.user) && tabFromHash() !== curTab) openTab(tabFromHash(), true); });
+
+async function refreshStats() {
+  try { state.stats = (await api('GET', '/admin/stats')).stats; buildNav(); } catch (e) {}
+}
+
+/* ---------- описание таблиц ---------- */
+const GRIDS = {
+  appointments: {
+    endpoint: '/admin/appointments', empty: 'Записей нет',
+    statuses: APPT_STATUS, statusOf: a => a.status,
+    head: ['Пациент','Контакты','Специалист','Дата приёма','Статус','Создана'],
+    text: a => [a.name, a.phone, a.email, a.specialist].join(' '),
+    row: a => `<tr>
+      <td><strong>${esc(a.name)}</strong></td>
+      <td>${esc(a.phone)}${a.email ? '<br><small>' + esc(a.email) + '</small>' : ''}</td>
+      <td>${esc(a.specialist)}</td>
+      <td class="nw">${fmtD(a.date)}</td>
+      <td><select class="mini-sel" onchange="setStatus('appointments',${a.id},this.value)">
+        ${Object.keys(APPT_STATUS).map(s => `<option value="${s}" ${a.status === s ? 'selected' : ''}>${APPT_STATUS[s][0]}</option>`).join('')}
+      </select></td>
+      <td class="nw">${esc(fmtDT(a.created_at))}</td></tr>`
+  },
+  reviews: {
+    endpoint: '/admin/reviews', empty: 'Отзывов нет',
+    statuses: REV_STATUS, statusOf: r => r.status,
+    head: ['Автор','Оценка','Отзыв','Статус','Действия'],
+    text: r => [r.name, r.text].join(' '),
+    row: r => `<tr>
+      <td><strong>${esc(r.name)}</strong><br><small>${esc(fmtDT(r.created_at))}</small></td>
+      <td class="stars">${'★'.repeat(Number(r.rating) || 0)}</td>
+      <td style="max-width:320px">${esc(r.text)}</td>
+      <td>${pill(REV_STATUS, r.status)}</td>
+      <td class="nw">
+        ${r.status !== 'approved' ? `<button class="mini-btn" onclick="setStatus('reviews',${r.id},'approved')">Одобрить</button>` : ''}
+        ${r.status !== 'rejected' ? `<button class="mini-btn" onclick="setStatus('reviews',${r.id},'rejected')">Отклонить</button>` : ''}
+        <button class="mini-btn danger" onclick="delItem('reviews',${r.id})">Удалить</button></td></tr>`
+  },
+  users: {
+    endpoint: '/admin/users', empty: 'Пользователей нет',
+    hint: 'Здесь вы назначаете роли. Роль применяется сразу, при следующем запросе пользователя. Нельзя снять роль, заблокировать или удалить самого себя.',
+    statuses: {active:['Активен','st-ok'], blocked:['Заблокирован','st-bad']}, statusOf: u => u.status,
+    head: ['ФИО','Контакты','Роль','Статус','Регистрация','Действия'],
+    text: u => [u.name, u.email, u.phone].join(' '),
+    row: u => {
+      const self = u.id === state.user.id;
+      return `<tr>
+      <td><strong>${esc(u.name)}</strong>${self ? ' <small>(вы)</small>' : ''}</td>
+      <td>${esc(u.email)}<br><small>${esc(u.phone)}</small></td>
+      <td><select class="mini-sel" ${self ? 'disabled' : ''} onchange="patchUser('${u.id}',{role:this.value})">
+        <option value="user" ${u.role === 'user' ? 'selected' : ''}>Пользователь</option>
+        <option value="operator" ${u.role === 'operator' ? 'selected' : ''}>Оператор</option>
+        <option value="moderator" ${u.role === 'moderator' ? 'selected' : ''}>Модератор</option>
+        <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Администратор</option></select></td>
+      <td>${u.status === 'active' ? '<span class="st-pill st-ok">Активен</span>' : '<span class="st-pill st-bad">Заблокирован</span>'}</td>
+      <td>${esc(fmtDate(u.created_at))}<br><small>вход: ${esc(fmtDT(u.last_login))}</small></td>
+      <td class="nw">${self ? '—' : `
+        <button class="mini-btn" onclick="patchUser('${u.id}',{status:'${u.status === 'active' ? 'blocked' : 'active'}'})">${u.status === 'active' ? 'Заблокировать' : 'Разблокировать'}</button>
+        <button class="mini-btn" onclick="resetPwd('${u.id}')">Сброс пароля</button>
+        <button class="mini-btn danger" onclick="delUser('${u.id}')">Удалить</button>`}</td></tr>`;
+    }
+  },
+  resumes: {
+    endpoint: '/admin/resumes', empty: 'Резюме нет',
+    statuses: RES_STATUS, statusOf: r => r.status,
+    head: ['Кандидат','Контакты','Должность','Опыт','Действия'],
+    text: r => [r.fio, r.phone, r.email, r.position, r.experience].join(' '),
+    row: r => `<tr>
+      <td><strong>${esc(r.fio)}</strong>${r.status === 'new' ? ' <span class="st-pill st-new">новое</span>' : ''}<br><small>${esc(fmtDT(r.created_at))}</small></td>
+      <td>${esc(r.phone)}<br><small>${esc(r.email)}</small></td>
+      <td>${esc(r.position)}</td>
+      <td style="max-width:280px">${esc(r.experience || '—')}</td>
+      <td class="nw">
+        ${r.status === 'new' ? `<button class="mini-btn" onclick="setStatus('resumes',${r.id},'viewed')">Просмотрено</button>` : ''}
+        <button class="mini-btn danger" onclick="delItem('resumes',${r.id})">Удалить</button></td></tr>`
+  },
+  audit: {
+    endpoint: '/admin/audit', empty: 'Журнал пуст',
+    head: ['Время','Кто','Действие','Подробности'],
+    text: l => [l.actor_name, l.action, l.details].join(' '),
+    row: l => `<tr><td class="nw">${esc(fmtDT(l.created_at))}</td><td>${esc(l.actor_name)}</td><td>${esc(l.action)}</td><td>${esc(l.details)}</td></tr>`
+  }
+};
+
+/* ---------- загрузка и отрисовка ---------- */
+let loadSeq = 0;
+async function loadTab() {
+  const body = $('tabBody');
+  const my = ++loadSeq, tab = curTab;
+  body.innerHTML = '<div class="empty">Загрузка…</div>';
+  try {
+    if (state.user.role !== 'operator') await refreshStats();
+    if (my !== loadSeq) return;
+    if (tab === 'support') await drawSupport(body, my);
+    else if (tab === 'overview') drawOverview(body);
+    else if (tab === 'ads') await drawAds(body, my);
+    else {
+      const g = GRIDS[tab];
+      const {items} = await api('GET', g.endpoint);
+      if (my !== loadSeq) return;
+      cache = items;
+      drawGridShell(body, g);
+    }
+  } catch (err) {
+    if (my !== loadSeq) return;
+    body.innerHTML = `<div class="empty" style="color:var(--danger)">${esc(err.message)}</div>`;
+  }
+}
+
+function drawOverview(body) {
+  const s = state.stats || {}, me = state.user;
+  const card = (tab, icon, num, label, extra) => `
+    <div class="stat" onclick="openTab('${tab}')"><div class="stat-ico"><i class="${icon}"></i></div>
+    <div><strong>${num ?? 0}</strong><span>${label}${extra}</span></div></div>`;
+  const em = (n, w) => n ? ` <em>· ${w}: ${n}</em>` : '';
+  body.innerHTML = `
+    <div class="stat-grid">
+      ${isAdmin(me) ? card('users', 'ri-group-line', s.users, 'Пользователей', '') : ''}
+      ${card('appointments', 'ri-calendar-check-line', s.appointments, 'Записей на приём', em(s.newAppointments, 'новых'))}
+      ${card('reviews', 'ri-chat-quote-line', s.reviews, 'Отзывов', em(s.pendingReviews, 'на модерации'))}
+      ${isAdmin(me) ? card('resumes', 'ri-file-user-line', s.resumes, 'Резюме', em(s.newResumes, 'новых')) : ''}
+    </div>
+    <div class="note"><strong>Ваши права: ${esc(ROLE_LABEL[me.role])}</strong>
+      ${isAdmin(me)
+        ? 'Полный доступ: управление пользователями и ролями, записи, отзывы, обращения поддержки, резюме, настройки рекламы и журнал действий.'
+        : 'Обработка записей на приём, модерация отзывов и ответы на обращения поддержки.'}</div>`;
+}
+
+function drawGridShell(body, g) {
+  const opts = g.statuses ? Object.keys(g.statuses).map(k => `<option value="${k}">${g.statuses[k][0]}</option>`).join('') : '';
+  body.innerHTML = `
+    ${g.hint ? `<p class="hint">${esc(g.hint)}</p>` : ''}
+    <div class="toolbar">
+      <div class="search"><i class="ri-search-line"></i><input type="search" id="fQ" placeholder="Поиск…" aria-label="Поиск"></div>
+      ${g.statuses ? `<select id="fS" aria-label="Фильтр по статусу"><option value="">Все статусы</option>${opts}</select>` : ''}
+      <span class="count" id="fCount"></span>
+    </div>
+    <div class="tbl-wrap"><table><thead><tr>${g.head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody id="gridBody"></tbody></table></div>`;
+  $('fQ').addEventListener('input', e => { view.q = e.target.value; drawGridRows(g); });
+  if (g.statuses) $('fS').addEventListener('change', e => { view.status = e.target.value; drawGridRows(g); });
+  drawGridRows(g);
+}
+
+function drawGridRows(g) {
+  const q = view.q.trim().toLowerCase();
+  const rows = cache.filter(it =>
+    (!q || g.text(it).toLowerCase().includes(q)) &&
+    (!view.status || g.statusOf(it) === view.status));
+  $('gridBody').innerHTML = rows.length
+    ? rows.map(g.row).join('')
+    : `<tr><td colspan="${g.head.length}" class="empty">${q || view.status ? 'Ничего не найдено' : g.empty}</td></tr>`;
+  $('fCount').textContent = rows.length === cache.length ? `Всего: ${cache.length}` : `Показано ${rows.length} из ${cache.length}`;
+}
+
+
+/* ---------- обращения в поддержку ---------- */
+let selectedTicket = 0;
+async function drawSupport(body, my) {
+  const {items}=await api('GET','/operator/tickets');
+  if(my!==loadSeq)return;
+  const open=items.filter(t=>t.status==='open').length;
+  body.innerHTML=`<div class="note"><strong>Обращения пользователей</strong><br>Открытых обращений: ${open}. Выберите обращение, чтобы прочитать переписку и ответить.</div>
+    <div class="toolbar"><span class="count">Всего обращений: ${items.length}</span><button class="btn btn-o" onclick="loadTab()"><i class="ri-refresh-line"></i>Обновить</button></div>
+    <div class="support-admin-layout">
+      <div class="support-ticket-list">${items.length?items.map(t=>`<button class="support-ticket ${selectedTicket===Number(t.id)?'active':''}" onclick="openSupportTicket(${Number(t.id)})">
+        <strong>#${t.id} · ${esc(t.user_name||t.guest_name||'Гость')}</strong><small>${esc(t.subject)} · ${esc(fmtDT(t.updated_at))}</small>
+        <span>${esc((t.last_message||'').slice(0,100))}</span><em class="${t.status==='open'?'ticket-open':'ticket-closed'}">${t.status==='open'?'Открыто':'Закрыто'}</em></button>`).join(''):'<div class="empty">Обращений пока нет</div>'}</div>
+      <div class="support-ticket-detail" id="supportTicketDetail"><div class="empty">Выберите обращение слева</div></div>
+    </div>`;
+  if(selectedTicket && items.some(t=>Number(t.id)===selectedTicket)) await openSupportTicket(selectedTicket);
+}
+async function openSupportTicket(id){
+  selectedTicket=id;
+  const box=$('supportTicketDetail');if(!box)return;
+  box.innerHTML='<div class="empty">Загрузка переписки…</div>';
+  try{
+    const r=await api('GET',`/operator/tickets/${id}`),t=r.ticket;
+    box.innerHTML=`<div class="support-detail-head"><div><strong>Обращение #${id}</strong><small>${esc(t.user_name||t.guest_name||'Гость')} · ${esc(t.user_email||t.guest_email||'')}</small></div>
+      <button class="btn btn-o" onclick="setTicketStatus(${id},'${t.status==='open'?'closed':'open'}')">${t.status==='open'?'Закрыть обращение':'Открыть обращение'}</button></div>
+      <div class="support-admin-messages" id="supportAdminMessages">${r.messages.map(m=>`<div class="support-admin-msg ${m.sender_role==='operator'?'operator':''}"><p>${esc(m.message)}</p><small>${m.sender_role==='operator'?'Оператор':m.sender_role==='guest'?'Посетитель':'Пользователь'} · ${esc(fmtDT(m.created_at))}</small></div>`).join('')}</div>
+      ${t.status==='open'?`<form class="support-admin-reply" onsubmit="sendOperatorReply(event,${id})"><textarea id="operatorReply" required maxlength="3000" placeholder="Введите ответ пользователю..."></textarea><button class="btn btn-p"><i class="ri-send-plane-fill"></i>Ответить</button></form>`:'<div class="hint">Обращение закрыто. Откройте его, чтобы продолжить переписку.</div>'}`;
+    const msgs=$('supportAdminMessages');msgs.scrollTop=msgs.scrollHeight;
+  }catch(e){box.innerHTML=`<div class="empty">${esc(e.message)}</div>`}
+}
+async function sendOperatorReply(e,id){
+  e.preventDefault();const f=$('operatorReply'),message=f.value.trim();if(!message)return;
+  try{await api('POST',`/operator/tickets/${id}/messages`,{message});await openSupportTicket(id);toast('success','Ответ отправлен','Пользователь увидит сообщение в чате.')}
+  catch(err){toast('error','Ошибка',err.message)}
+}
+async function setTicketStatus(id,status){
+  try{await api('PATCH',`/operator/tickets/${id}`,{status});await drawSupport($('tabBody'),loadSeq);toast('success','Статус изменён','')}
+  catch(e){toast('error','Ошибка',e.message)}
+}
+
+/* ---------- реклама ---------- */
+async function drawAds(body, my) {
+  const {settings: st, house} = await api('GET', '/admin/ads');
+  if (my !== loadSeq) return;
+  const inp = (id, label, val, ph) => `<div class="fg"><label for="${id}">${label}</label><input type="text" id="${id}" value="${esc(val)}" placeholder="${ph}"></div>`;
+  body.innerHTML = `
+    <p class="hint">Реклама показывается в двух местах страницы. Рекламные сети (Google AdSense, Яндекс) работают только на одобренном домене и показываются посетителям, которые разрешили маркетинговые cookie.</p>
+    <div class="card">
+      <h3>Источник рекламы</h3>
+      <div class="fg"><label for="adsProvider">Источник</label>
+        <select id="adsProvider">
+          ${[['off','Выключена'],['house','Свои баннеры'],['adsense','Google AdSense'],['yandex','Рекламная сеть Яндекса']].map(o => `<option value="${o[0]}" ${st.provider === o[0] ? 'selected' : ''}>${o[1]}</option>`).join('')}
+        </select></div>
+      <div class="ads-grid">
+        ${inp('adsClient', 'AdSense: client ID', st.adsense_client, 'ca-pub-1234567890123456')}
+        ${inp('adsSlot1', 'AdSense: slot блока 1', st.adsense_slot1, '1234567890')}
+        ${inp('adsSlot2', 'AdSense: slot блока 2', st.adsense_slot2, '1234567890')}
+        ${inp('yaBlock1', 'Яндекс: blockId блока 1', st.yandex_block1, 'R-A-123456-1')}
+        ${inp('yaBlock2', 'Яндекс: blockId блока 2', st.yandex_block2, 'R-A-123456-2')}
+      </div>
+      <button class="btn btn-p" onclick="saveAdSettings()"><i class="ri-save-line"></i>Сохранить настройки</button>
+    </div>
+    <div class="card">
+      <h3>Свои баннеры</h3>
+      <div class="ads-grid">
+        <div class="fg"><label for="haTitle">Заголовок</label><input type="text" id="haTitle" maxlength="80"></div>
+        <div class="fg"><label for="haUrl">Ссылка</label><input type="text" id="haUrl" placeholder="https://... или #appointment"></div>
+        <div class="fg"><label for="haText">Текст</label><input type="text" id="haText" maxlength="200"></div>
+        <div class="fg"><label for="haSlot">Место</label><select id="haSlot"><option value="0">Любое</option><option value="1">Блок 1</option><option value="2">Блок 2</option></select></div>
+      </div>
+      <button class="btn btn-o" onclick="addHouseAd()"><i class="ri-add-line"></i>Добавить баннер</button>
+    </div>
+    <div class="tbl-wrap"><table><thead><tr><th>Баннер</th><th>Ссылка</th><th>Место</th><th>Статус</th><th>Действия</th></tr></thead><tbody>
+      ${house.length ? house.map(h => `<tr>
+        <td><strong>${esc(h.title)}</strong><br><small>${esc(h.text)}</small></td>
+        <td style="max-width:240px;word-break:break-all"><small>${esc(h.url)}</small></td>
+        <td>${h.slot ? 'Блок ' + h.slot : 'Любое'}</td>
+        <td>${h.active ? '<span class="st-pill st-ok">Включён</span>' : '<span class="st-pill st-bad">Выключен</span>'}</td>
+        <td class="nw"><button class="mini-btn" onclick="toggleHouseAd(${h.id},${h.active ? 'false' : 'true'})">${h.active ? 'Выключить' : 'Включить'}</button>
+          <button class="mini-btn danger" onclick="delHouseAd(${h.id})">Удалить</button></td></tr>`).join('')
+        : '<tr><td colspan="5" class="empty">Баннеров пока нет</td></tr>'}
+    </tbody></table></div>`;
+}
+
+/* ============================================ */
+/* ===== ДЕЙСТВИЯ ============================= */
+/* ============================================ */
+async function act(fn, okTitle, okMsg) {
+  try { await fn(); if (okTitle) toast('success', okTitle, okMsg); }
+  catch (err) { toast('error', 'Ошибка', err.message); }
+  loadTab();
+}
+const setStatus = (kind, id, status) => act(() => api('PATCH', `/admin/${kind}/${id}`, {status}), 'Сохранено', '');
+const delItem = (kind, id) => confirm('Удалить запись без возможности восстановления?') && act(() => api('DELETE', `/admin/${kind}/${id}`), 'Удалено', '');
+const patchUser = (id, patch) => act(() => api('PATCH', `/admin/users/${id}`, patch), 'Сохранено', patch.role ? 'Роль изменена' : 'Статус изменён');
+const delUser = id => confirm('Удалить пользователя? Его записи и отзывы останутся без привязки к аккаунту.') && act(() => api('DELETE', `/admin/users/${id}`), 'Пользователь удалён', '');
+
+async function resetPwd(id) {
+  if (!confirm('Сгенерировать новый временный пароль? Пользователь будет разлогинен.')) return;
+  try {
+    const r = await api('POST', `/admin/users/${id}/reset-password`);
+    prompt('Временный пароль (скопируйте и передайте пользователю):', r.password);
+  } catch (err) { toast('error', 'Ошибка', err.message); }
+}
+
+/* ----- реклама ----- */
+const val = id => $(id).value.trim();
+const saveAdSettings = () => act(() => api('PUT', '/admin/ads', {
+  provider: val('adsProvider'), adsense_client: val('adsClient'), adsense_slot1: val('adsSlot1'), adsense_slot2: val('adsSlot2'),
+  yandex_block1: val('yaBlock1'), yandex_block2: val('yaBlock2')}), 'Сохранено', 'Настройки рекламы обновлены');
+const addHouseAd = () => act(() => api('POST', '/admin/ads/house', {title: val('haTitle'), text: val('haText'), url: val('haUrl'), slot: Number(val('haSlot'))}), 'Баннер добавлен', '');
+const toggleHouseAd = (id, active) => act(() => api('PATCH', `/admin/ads/house/${id}`, {active}));
+const delHouseAd = id => confirm('Удалить баннер?') && act(() => api('DELETE', `/admin/ads/house/${id}`));
+
+/* ============================================ */
+/* ===== СТАРТ ================================ */
+/* ============================================ */
+(async function init() {
+  await refreshSession();
+  route();
+})();
+</script>
+</body>
+</html>
