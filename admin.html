@@ -79,6 +79,7 @@ button,input,select{font-family:inherit}
 .role-badge{display:inline-block;padding:1px 8px;border-radius:8px;font-size:.66rem;font-weight:700}
 .role-admin{background:rgba(239,68,68,.12);color:var(--danger)}
 .role-moderator{background:rgba(245,158,11,.14);color:#b45309}
+.role-editor{background:rgba(14,165,233,.14);color:#0369a1}
 .icon-btn{width:36px;height:36px;border-radius:10px;border:1.5px solid var(--glass-border);background:var(--bg-white);color:var(--text-muted);cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:all .2s}
 .icon-btn:hover{color:var(--danger);border-color:var(--danger)}
 
@@ -269,8 +270,8 @@ const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('ru-RU', {day:'2-d
 const fmtDT = iso => iso ? new Date(iso).toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'}) : '—';
 const fmtD = d => d ? esc(String(d).split('-').reverse().join('.')) : '—';
 const initialsOf = n => String(n || '?').trim().split(/\s+/).map(w => w[0]).join('').substring(0, 2).toUpperCase();
-const ROLE_LABEL = {admin:'Администратор', moderator:'Модератор', operator:'Оператор', user:'Пациент'};
-const isStaff = u => u && ['admin','moderator','operator'].includes(u.role);
+const ROLE_LABEL = {admin:'Администратор', moderator:'Модератор', editor:'Редактор', operator:'Оператор', user:'Пациент'};
+const isStaff = u => u && ['admin','moderator','editor','operator'].includes(u.role);
 const isAdmin = u => u && u.role === 'admin';
 
 const APPT_STATUS = {new:['Новая','st-new'], confirmed:['Подтверждена','st-ok'], done:['Завершена','st-done'], cancelled:['Отменена','st-bad']};
@@ -340,24 +341,22 @@ async function logout() {
 /* ===== РАЗДЕЛЫ ============================== */
 /* ============================================ */
 const TABS = [
-  {id:'support',      title:'Поддержка',    icon:'ri-customer-service-2-line', sub:'Обращения пользователей', operator:true},
-  {id:'overview',     title:'Обзор',        icon:'ri-dashboard-line',        sub:'Сводка по сайту'},
-  {id:'appointments', title:'Записи',       icon:'ri-calendar-check-line',   sub:'Записи пациентов на приём', badge:'newAppointments'},
-  {id:'reviews',      title:'Отзывы',       icon:'ri-chat-quote-line',       sub:'Модерация отзывов пациентов', badge:'pendingReviews'},
-  {id:'users',        title:'Пользователи', icon:'ri-user-settings-line',    sub:'Роли, блокировка и сброс паролей', admin:true},
-  {id:'resumes',      title:'Резюме',       icon:'ri-file-user-line',        sub:'Отклики на вакансии', admin:true, badge:'newResumes'},
-  {id:'ads',          title:'Реклама',      icon:'ri-advertisement-line',    sub:'Баннеры и рекламные сети', admin:true},
-  {id:'audit',        title:'Журнал',       icon:'ri-history-line',          sub:'История действий в панели', admin:true},
+  {id:'support',      title:'Поддержка',    icon:'ri-customer-service-2-line', sub:'Обращения пользователей', operator:true, roles:['operator','moderator','admin']},
+  {id:'overview',     title:'Обзор',        icon:'ri-dashboard-line',        sub:'Сводка по сайту', roles:['moderator','admin']},
+  {id:'appointments', title:'Записи',       icon:'ri-calendar-check-line',   sub:'Записи пациентов на приём', badge:'newAppointments', roles:['moderator','admin']},
+  {id:'reviews',      title:'Отзывы',       icon:'ri-chat-quote-line',       sub:'Модерация отзывов пациентов', badge:'pendingReviews', roles:['moderator','editor','admin']},
+  {id:'news',         title:'Новости',      icon:'ri-newspaper-line',        sub:'Публикации в разделе «Последние новости»', roles:['editor','admin']},
+  {id:'users',        title:'Пользователи', icon:'ri-user-settings-line',    sub:'Роли, блокировка и сброс паролей', admin:true, roles:['admin']},
+  {id:'resumes',      title:'Резюме',       icon:'ri-file-user-line',        sub:'Отклики на вакансии', admin:true, badge:'newResumes', roles:['admin']},
+  {id:'ads',          title:'Реклама',      icon:'ri-advertisement-line',    sub:'Баннеры и рекламные сети', roles:['editor','admin']},
+  {id:'audit',        title:'Журнал',       icon:'ri-history-line',          sub:'История действий в панели', admin:true, roles:['admin']},
 ];
-const visibleTabs = () => TABS.filter(t => {
-  const u=state.user;
-  if (t.admin && !isAdmin(u)) return false;
-  if (u?.role === 'operator') return t.id === 'support';
-  return true;
-});
+const visibleTabs = () => TABS.filter(t => t.roles.includes(state.user?.role));
 const tabFromHash = () => {
   const id = location.hash.replace('#', '');
-  return visibleTabs().some(t => t.id === id) ? id : 'overview';
+  const vis = visibleTabs();
+  if (vis.some(t => t.id === id)) return id;
+  return vis.some(t => t.id === 'overview') ? 'overview' : (vis[0] ? vis[0].id : 'overview');
 };
 let curTab = 'overview';
 let view = { q: '', status: '' };   // фильтры текущей таблицы
@@ -436,6 +435,7 @@ const GRIDS = {
         <option value="user" ${u.role === 'user' ? 'selected' : ''}>Пользователь</option>
         <option value="operator" ${u.role === 'operator' ? 'selected' : ''}>Оператор</option>
         <option value="moderator" ${u.role === 'moderator' ? 'selected' : ''}>Модератор</option>
+        <option value="editor" ${u.role === 'editor' ? 'selected' : ''}>Редактор</option>
         <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Администратор</option></select></td>
       <td>${u.status === 'active' ? '<span class="st-pill st-ok">Активен</span>' : '<span class="st-pill st-bad">Заблокирован</span>'}</td>
       <td>${esc(fmtDate(u.created_at))}<br><small>вход: ${esc(fmtDT(u.last_login))}</small></td>
@@ -479,6 +479,7 @@ async function loadTab() {
     if (tab === 'support') await drawSupport(body, my);
     else if (tab === 'overview') drawOverview(body);
     else if (tab === 'ads') await drawAds(body, my);
+    else if (tab === 'news') await drawNews(body, my);
     else {
       const g = GRIDS[tab];
       const {items} = await api('GET', g.endpoint);
@@ -583,6 +584,7 @@ async function drawAds(body, my) {
   if (my !== loadSeq) return;
   const inp = (id, label, val, ph) => `<div class="fg"><label for="${id}">${label}</label><input type="text" id="${id}" value="${esc(val)}" placeholder="${ph}"></div>`;
   body.innerHTML = `
+    ${isAdmin(state.user) ? `
     <p class="hint">Реклама показывается в двух местах страницы. Рекламные сети (Google AdSense, Яндекс) работают только на одобренном домене и показываются посетителям, которые разрешили маркетинговые cookie.</p>
     <div class="card">
       <h3>Источник рекламы</h3>
@@ -599,6 +601,7 @@ async function drawAds(body, my) {
       </div>
       <button class="btn btn-p" onclick="saveAdSettings()"><i class="ri-save-line"></i>Сохранить настройки</button>
     </div>
+    ` : '<p class="hint">Здесь можно добавлять, включать и отключать свои баннеры. Настройки рекламных сетей доступны администратору.</p>'}
     <div class="card">
       <h3>Свои баннеры</h3>
       <div class="ads-grid">
@@ -641,6 +644,60 @@ async function resetPwd(id) {
     prompt('Временный пароль (скопируйте и передайте пользователю):', r.password);
   } catch (err) { toast('error', 'Ошибка', err.message); }
 }
+
+
+/* ----- новости ----- */
+let nwEditId = null;
+const NEWS_ICON_LIST = [['newsMed','Медицина'],['newsCheck','Галочка'],['newsHeart','Сердце'],['newsShield','Щит'],['newsWarn','Внимание'],['newsCake','Праздник']];
+async function drawNews(body, my) {
+  const {items} = await api('GET', '/admin/news');
+  if (my !== loadSeq) return;
+  cache = items; nwEditId = null;
+  const today = new Date().toISOString().slice(0, 10);
+  body.innerHTML = `
+    <p class="hint">Новости показываются на главной странице в разделе «Последние новости». Скрытая новость остаётся в списке, но посетители её не видят.</p>
+    <div class="card">
+      <h3 id="nwFormTitle">Новая новость</h3>
+      <div class="ads-grid">
+        <div class="fg"><label for="nwTitle">Заголовок</label><input type="text" id="nwTitle" maxlength="200"></div>
+        <div class="fg"><label for="nwTag">Метка</label><input type="text" id="nwTag" maxlength="30" placeholder="Например: Важно"></div>
+        <div class="fg"><label for="nwDate">Дата</label><input type="date" id="nwDate" value="${today}"></div>
+        <div class="fg"><label for="nwIcon">Значок</label><select id="nwIcon">${NEWS_ICON_LIST.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('')}</select></div>
+      </div>
+      <div class="fg"><label for="nwText">Текст</label><textarea id="nwText" rows="4" maxlength="3000" style="width:100%;border:1px solid var(--glass-border);border-radius:10px;padding:10px;font:inherit;resize:vertical"></textarea></div>
+      <button class="btn btn-p" id="nwSave" onclick="saveNews()"><i class="ri-save-line"></i>Опубликовать</button>
+      <button class="btn btn-o" id="nwCancel" onclick="loadTab()" hidden>Отмена</button>
+    </div>
+    <div class="tbl-wrap"><table><thead><tr><th>Новость</th><th>Дата</th><th>Статус</th><th>Действия</th></tr></thead><tbody>
+      ${items.length ? items.map(n => `<tr>
+        <td style="max-width:360px"><strong>${esc(n.title)}</strong><br><small>${esc(n.tag)} · ${esc(n.text.substring(0, 90))}${n.text.length > 90 ? '…' : ''}</small></td>
+        <td class="nw">${esc(n.date_label)}</td>
+        <td>${n.published ? '<span class="st-pill st-ok">Опубликована</span>' : '<span class="st-pill st-bad">Скрыта</span>'}</td>
+        <td class="nw"><button class="mini-btn" onclick="editNews(${n.id})">Изменить</button>
+          <button class="mini-btn" onclick="toggleNews(${n.id},${n.published ? 'false' : 'true'})">${n.published ? 'Скрыть' : 'Показать'}</button>
+          <button class="mini-btn danger" onclick="delNews(${n.id})">Удалить</button></td></tr>`).join('')
+        : '<tr><td colspan="4" class="empty">Новостей пока нет</td></tr>'}
+    </tbody></table></div>`;
+}
+function editNews(id) {
+  const n = cache.find(x => x.id === id);
+  if (!n) return;
+  nwEditId = id;
+  $('nwTitle').value = n.title; $('nwTag').value = n.tag; $('nwDate').value = n.sort_date;
+  $('nwIcon').value = n.icon; $('nwText').value = n.text;
+  $('nwFormTitle').textContent = 'Редактирование новости';
+  $('nwSave').innerHTML = '<i class="ri-save-line"></i>Сохранить изменения';
+  $('nwCancel').hidden = false;
+  $('nwTitle').scrollIntoView({behavior: 'smooth', block: 'center'});
+  $('nwTitle').focus();
+}
+const saveNews = () => {
+  const data = {title: $('nwTitle').value.trim(), tag: $('nwTag').value.trim(), date: $('nwDate').value, icon: $('nwIcon').value, text: $('nwText').value.trim()};
+  const id = nwEditId;
+  return act(() => id ? api('PATCH', `/admin/news/${id}`, data) : api('POST', '/admin/news', data), id ? 'Новость обновлена' : 'Новость опубликована', '');
+};
+const toggleNews = (id, published) => act(() => api('PATCH', `/admin/news/${id}`, {published}));
+const delNews = id => confirm('Удалить новость без возможности восстановления?') && act(() => api('DELETE', `/admin/news/${id}`), 'Удалено', '');
 
 /* ----- реклама ----- */
 const val = id => $(id).value.trim();

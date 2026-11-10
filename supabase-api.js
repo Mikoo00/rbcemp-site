@@ -15,7 +15,8 @@
     'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js'
   ];
 
-  const ROLE_RANK = { user: 1, operator: 2, moderator: 3, admin: 4 };
+  // У редактора особый набор прав (новости, отзывы, баннеры), поэтому он не выше оператора и модератора по рангу.
+  const ROLE_RANK = { user: 1, editor: 1.5, operator: 2, moderator: 3, admin: 4 };
 
   /* ---------- ошибки ---------- */
   function fail(status, message, field) {
@@ -141,6 +142,11 @@
     if (!u) throw fail(401, 'Требуется вход в аккаунт');
     if (u.status !== 'active') throw fail(403, 'Аккаунт заблокирован. Обратитесь в администрацию.');
     if (minRole && ROLE_RANK[u.role] < ROLE_RANK[minRole]) throw fail(403, 'Недостаточно прав');
+    return u;
+  }
+  async function requireAny(roles) {
+    const u = await requireUser();
+    if (!roles.includes(u.role)) throw fail(403, 'Недостаточно прав');
     return u;
   }
   async function audit(user, action, details) {
@@ -330,7 +336,7 @@
     const rating = Number(b.rating);
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw fail(400, 'Оценка от 1 до 5', 'rating');
     const text = vstr(b.text, 10, 2000, 'Отзыв', 'text');
-    const status = ROLE_RANK[u.role] >= ROLE_RANK.moderator ? 'approved' : 'pending';
+    const status = ['moderator', 'editor', 'admin'].includes(u.role) ? 'approved' : 'pending';
     const sb = await client();
     const row = must(await sb.from('reviews')
       .insert({ user_id: u.id, name, rating, text, status }).select('id').single(), 'Не удалось отправить отзыв');
@@ -401,13 +407,15 @@
 
   /* ===== персонал: модератор и выше ===== */
   route('GET', '/admin/stats', async () => {
-    const u = await requireUser('moderator');
+    const u = await requireAny(['moderator', 'editor', 'admin']);
     const stats = {
-      appointments: await countOf('appointments'),
-      newAppointments: await countOf('appointments', q => q.eq('status', 'new')),
       reviews: await countOf('reviews'),
       pendingReviews: await countOf('reviews', q => q.eq('status', 'pending'))
     };
+    if (u.role !== 'editor') {
+      stats.appointments = await countOf('appointments');
+      stats.newAppointments = await countOf('appointments', q => q.eq('status', 'new'));
+    }
     if (u.role === 'admin') {
       stats.users = await countOf('profiles');
       stats.resumes = await countOf('resumes');
@@ -437,7 +445,7 @@
   });
 
   route('GET', '/admin/reviews', async () => {
-    await requireUser('moderator');
+    await requireAny(['moderator', 'editor', 'admin']);
     const sb = await client();
     const rows = must(await sb.from('reviews').select('*').order('created_at', { ascending: false }).limit(300));
     rows.sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1));
@@ -445,7 +453,7 @@
   });
 
   route('PATCH', '/admin/reviews/:id', async (c) => {
-    const u = await requireUser('moderator');
+    const u = await requireAny(['moderator', 'editor', 'admin']);
     const id = toId(c.params.id);
     const status = oneOf(c.body.status, ['pending', 'approved', 'rejected'], 'Статус');
     const sb = await client();
@@ -456,7 +464,7 @@
   });
 
   route('DELETE', '/admin/reviews/:id', async (c) => {
-    const u = await requireUser('moderator');
+    const u = await requireAny(['moderator', 'editor', 'admin']);
     const id = toId(c.params.id);
     const sb = await client();
     const rows = must(await sb.from('reviews').delete().eq('id', id).select('id'));
@@ -512,7 +520,7 @@
     const changes = [];
     const patch = {};
     if (b.role !== undefined && b.role !== null) {
-      const role = oneOf(b.role, ['user', 'operator', 'moderator', 'admin'], 'Роль');
+      const role = oneOf(b.role, ['user', 'operator', 'moderator', 'editor', 'admin'], 'Роль');
       if (id === me.id && role !== 'admin') throw fail(400, 'Нельзя снять роль администратора с самого себя');
       if (target.role === 'admin' && role !== 'admin' && (await otherActiveAdmins(id)) < 1) {
         throw fail(400, 'Нельзя убрать последнего администратора');
@@ -551,6 +559,78 @@
     return { items: must(await sb.from('audit_log').select('*').order('id', { ascending: false }).limit(100)) };
   });
 
+
+  /* ===== новости ===== */
+  const NEWS_ICONS = ['newsCake', 'newsCheck', 'newsHeart', 'newsShield', 'newsWarn', 'newsMed'];
+  const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  function newsDate(v) {
+    const s = trimStr(v);
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    const d = m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null;
+    if (!d || d.toISOString().slice(0, 10) !== s) throw fail(400, 'Некорректная дата', 'date');
+    return { sort: s, label: `${+m[3]} ${MONTHS[+m[2] - 1]} ${m[1]}` };
+  }
+
+  route('GET', '/news', async () => {
+    const sb = await client();
+    const rows = must(await sb.from('news').select('id,title,tag,icon,text,date_label')
+      .eq('published', true).order('sort_date', { ascending: false }).order('id', { ascending: false }).limit(50));
+    return { items: rows };
+  });
+
+  route('GET', '/admin/news', async () => {
+    await requireAny(['editor', 'admin']);
+    const sb = await client();
+    const rows = must(await sb.from('news').select('*')
+      .order('sort_date', { ascending: false }).order('id', { ascending: false }).limit(300));
+    return { items: rows };
+  });
+
+  route('POST', '/admin/news', async (c) => {
+    const u = await requireAny(['editor', 'admin']);
+    const b = c.body;
+    const title = vstr(b.title, 3, 200, 'Заголовок', 'title');
+    const tag = vopt(b.tag, 30, 'Метка', 'tag') || 'Новости';
+    const text = vstr(b.text, 10, 3000, 'Текст', 'text');
+    const icon = NEWS_ICONS.includes(b.icon) ? b.icon : 'newsMed';
+    const dt = newsDate(b.date);
+    const sb = await client();
+    const row = must(await sb.from('news').insert({
+      title, tag, icon, text, date_label: dt.label, sort_date: dt.sort, published: true, created_by: u.id
+    }).select('id').single(), 'Не удалось сохранить новость');
+    await audit(u, 'news.create', title);
+    return { id: row.id };
+  });
+
+  route('PATCH', '/admin/news/:id', async (c) => {
+    const u = await requireAny(['editor', 'admin']);
+    const id = toId(c.params.id);
+    const b = c.body;
+    const patch = {};
+    if (b.title !== undefined) patch.title = vstr(b.title, 3, 200, 'Заголовок', 'title');
+    if (b.tag !== undefined) patch.tag = vopt(b.tag, 30, 'Метка', 'tag') || 'Новости';
+    if (b.text !== undefined) patch.text = vstr(b.text, 10, 3000, 'Текст', 'text');
+    if (b.icon !== undefined) patch.icon = NEWS_ICONS.includes(b.icon) ? b.icon : 'newsMed';
+    if (b.date !== undefined) { const dt = newsDate(b.date); patch.sort_date = dt.sort; patch.date_label = dt.label; }
+    if (b.published !== undefined) patch.published = b.published === true || b.published === 'true' || b.published === 1;
+    if (!Object.keys(patch).length) throw fail(400, 'Нечего менять');
+    const sb = await client();
+    const rows = must(await sb.from('news').update(patch).eq('id', id).select('id,title'));
+    if (!rows.length) throw fail(404, 'Новость не найдена');
+    await audit(u, 'news.update', `#${id} ${rows[0].title}`);
+    return { ok: true };
+  });
+
+  route('DELETE', '/admin/news/:id', async (c) => {
+    const u = await requireAny(['editor', 'admin']);
+    const id = toId(c.params.id);
+    const sb = await client();
+    const rows = must(await sb.from('news').delete().eq('id', id).select('id,title'));
+    if (!rows.length) throw fail(404, 'Новость не найдена');
+    await audit(u, 'news.delete', `#${id} ${rows[0].title}`);
+    return { ok: true };
+  });
+
   /* ===== реклама ===== */
   route('GET', '/ads', async () => {
     const sb = await client();
@@ -560,7 +640,7 @@
   });
 
   route('GET', '/admin/ads', async () => {
-    await requireUser('admin');
+    await requireAny(['editor', 'admin']);
     const sb = await client();
     const house = must(await sb.from('house_ads').select('*').order('id', { ascending: false }));
     return { settings: await adSettings(), house };
@@ -589,7 +669,7 @@
   });
 
   route('POST', '/admin/ads/house', async (c) => {
-    const u = await requireUser('admin');
+    const u = await requireAny(['editor', 'admin']);
     const b = c.body;
     const title = vstr(b.title, 3, 80, 'Заголовок', 'title');
     const text = vstr(b.text, 3, 200, 'Текст', 'text');
@@ -603,7 +683,7 @@
   });
 
   route('PATCH', '/admin/ads/house/:id', async (c) => {
-    const u = await requireUser('admin');
+    const u = await requireAny(['editor', 'admin']);
     const id = toId(c.params.id);
     const v = c.body.active;
     const active = v === true || v === 1 || v === '1' || v === 'true';
@@ -615,7 +695,7 @@
   });
 
   route('DELETE', '/admin/ads/house/:id', async (c) => {
-    const u = await requireUser('admin');
+    const u = await requireAny(['editor', 'admin']);
     const id = toId(c.params.id);
     const sb = await client();
     const rows = must(await sb.from('house_ads').delete().eq('id', id).select('id'));

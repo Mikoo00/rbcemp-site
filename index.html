@@ -1093,8 +1093,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const fmtDate = iso => iso ? new Date(iso).toLocaleDateString('ru-RU', {day:'2-digit', month:'long', year:'numeric'}) : '—';
 const fmtDT = iso => iso ? new Date(iso).toLocaleString('ru-RU', {day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'}) : '—';
 const initialsOf = n => String(n || '?').trim().split(/\s+/).map(w => w[0]).join('').substring(0,2).toUpperCase();
-const ROLE_LABEL = {admin:'Администратор', moderator:'Модератор', operator:'Оператор', user:'Пациент'};
-const isStaff = u => u && ['admin', 'moderator', 'operator'].includes(u.role);
+const ROLE_LABEL = {admin:'Администратор', moderator:'Модератор', editor:'Редактор', operator:'Оператор', user:'Пациент'};
+const isStaff = u => u && ['admin', 'moderator', 'editor', 'operator'].includes(u.role);
 const isAdmin = u => u && u.role === 'admin';
 
 async function refreshSession() {
@@ -1421,7 +1421,7 @@ const services = [
   {icon:'reanim',title:'Реанимация',text:'Интенсивная терапия и реанимационная помощь круглосуточно.'},
 ];
 
-const newsData = [
+let newsData = [
   {icon:'newsCake',grad:'linear-gradient(135deg,#f59e0b,#ef4444)',tag:'Юбилей',date:'19 октября 2026',title:'100-летие Лидии Ивановны Бабенко',text:'Поздравляем нашего ветерана с юбилеем! Лидия Ивановна проработала в нашей больнице более 40 лет.'},
   {icon:'newsCheck',grad:'linear-gradient(135deg,#10b981,#06b6d4)',tag:'Важно',date:'19–25 октября 2026',title:'Неделя диспансеризации',text:'Информирование о важности профилактических осмотров и диспансеризации населения.'},
   {icon:'newsHeart',grad:'linear-gradient(135deg,#8b5cf6,#ec4899)',tag:'Поддержка',date:'13 октября 2026',title:'«Здоровье СВОих»',text:'Специальный чат для медицинской поддержки участников СВО и членов их семей.'},
@@ -1490,17 +1490,30 @@ function renderSvc() {
       <p>${s.text}</p>
     </div>`).join('');
 }
+const NEWS_GRAD = {
+  newsCake:'linear-gradient(135deg,#f59e0b,#ef4444)', newsCheck:'linear-gradient(135deg,#10b981,#06b6d4)',
+  newsHeart:'linear-gradient(135deg,#8b5cf6,#ec4899)', newsShield:'linear-gradient(135deg,#ec4899,#f43f5e)',
+  newsWarn:'linear-gradient(135deg,#6366f1,#8b5cf6)', newsMed:'linear-gradient(135deg,#059669,#10b981)'
+};
 function renderNews() {
   document.getElementById('newsGrid').innerHTML = newsData.map((n,i) => `
     <div class="news-card sa" style="transition-delay:${i*80}ms" onclick="showNews(${i})">
-      <div class="news-img" style="background:${n.grad}">${svgIcons[n.icon]}</div>
+      <div class="news-img" style="background:${NEWS_GRAD[n.icon] || NEWS_GRAD.newsMed}">${svgIcons[n.icon] || svgIcons.newsMed}</div>
       <div class="news-body">
-        <span class="news-tag">${n.tag}</span>
-        <div class="news-date">${n.date}</div>
-        <h3>${n.title}</h3>
-        <p>${n.text.substring(0,80)}${n.text.length>80?'...':''}</p>
+        <span class="news-tag">${esc(n.tag)}</span>
+        <div class="news-date">${esc(n.date)}</div>
+        <h3>${esc(n.title)}</h3>
+        <p>${esc(n.text.substring(0,80))}${n.text.length>80?'...':''}</p>
       </div>
     </div>`).join('');
+}
+async function loadNews() {
+  try {
+    const {items} = await api('GET', '/news');
+    newsData = items.map(n => ({icon:n.icon, tag:n.tag, date:n.date_label, title:n.title, text:n.text}));
+    renderNews();
+    checkSA();
+  } catch (e) { /* остаются новости, встроенные в страницу */ }
 }
 function renderTeam() {
   document.getElementById('teamGrid').innerHTML = teamData.map((t,i) => `
@@ -1819,6 +1832,7 @@ function init() {
   showCookieBanner();
   refreshSession();
   loadReviews();
+  loadNews();
   loadAds();
 }
 
